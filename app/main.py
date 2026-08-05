@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_config
 from app.db import init_db
 from app.logging_utils import attach_db_log_handler, setup_console_and_file_logging
+from app.web.routes_admin import router as admin_router
 from app.web.routes_clips import router as clips_router
 from app.web.routes_config import router as config_router
 from app.web.routes_status import router as status_router
@@ -52,6 +53,7 @@ app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 app.include_router(clips_router)
 app.include_router(config_router)
 app.include_router(status_router)
+app.include_router(admin_router)
 
 
 def main() -> None:

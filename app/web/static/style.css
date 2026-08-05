@@ -36,6 +36,19 @@ header {
 header h1 { font-size: 18px; margin: 0; }
 header nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
 header nav a:hover { color: var(--text); }
+header nav a.active { color: var(--text); font-weight: 600; }
+
+.shutdown-btn {
+  margin-left: 20px;
+  background: transparent;
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.shutdown-btn:hover { background: var(--bad); color: white; }
 
 main { padding: 20px; max-width: 1400px; margin: 0 auto; }
 
@@ -92,6 +105,18 @@ code { background: var(--panel); border: 1px solid var(--border); border-radius:
 }
 .toolbar button:disabled { opacity: 0.4; cursor: default; }
 .toolbar button.danger { background: var(--bad); }
+
+.filter-tabs { display: flex; gap: 4px; margin-right: auto; }
+.filter-tabs a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.filter-tabs a:hover { color: var(--text); }
+.filter-tabs a.active { color: var(--text); background: var(--bg); border-color: var(--border); font-weight: 600; }
 
 .day-group h2 { margin: 24px 0 8px; font-size: 16px; color: var(--muted); }
 
@@ -181,18 +206,22 @@ code { background: var(--panel); border: 1px solid var(--border); border-radius:
 }
 .tile .actions button.good-btn:hover { border-color: var(--good); color: var(--good); }
 .tile .actions button.bad-btn:hover { border-color: var(--bad); color: var(--bad); }
+.tile .actions button.reprocess-btn:hover { border-color: var(--accent); color: var(--accent); }
+.tile .actions button:disabled { opacity: 0.5; cursor: default; }
 
 #modal {
   display: none;
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.8);
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
   z-index: 100;
 }
 #modal.open { display: flex; }
-#modal video { max-width: 90vw; max-height: 85vh; }
+#modal video { max-width: 90vw; max-height: 80vh; }
 #modal .close-btn {
   position: absolute;
   top: 20px;
@@ -203,6 +232,18 @@ code { background: var(--panel); border: 1px solid var(--border); border-radius:
   background: none;
   border: none;
 }
+#modal .modal-actions { display: flex; gap: 12px; }
+#modal .modal-actions button {
+  font-size: 15px;
+  padding: 8px 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+#modal .modal-actions button.good-btn:hover { border-color: var(--good); color: var(--good); }
+#modal .modal-actions button.bad-btn:hover { border-color: var(--bad); color: var(--bad); }
 
 .empty-state { color: var(--muted); text-align: center; padding: 60px 0; }
 

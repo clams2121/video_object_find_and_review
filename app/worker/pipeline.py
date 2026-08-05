@@ -212,6 +212,25 @@ def _process_clip_safely(session: Session, clip: Clip, cfg: AppConfig) -> None:
         worker_status.record_error(f"{clip.event_id_ext}: {exc}", clip.event_id_ext)
 
 
+def reprocess_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
+    """Re-run the full pipeline on a clip that's already been processed once
+    (e.g. to fix a bad thumbnail or reclassify after a config/threshold
+    change). Points source_*_path at wherever the files currently live so
+    the normal _process_clip logic - unchanged - can move them again."""
+    if clip.thumbnail_path and Path(clip.thumbnail_path).exists():
+        Path(clip.thumbnail_path).unlink()
+
+    clip.source_video_path = clip.output_video_path or clip.source_video_path
+    clip.source_json_path = clip.output_json_path or clip.source_json_path
+    clip.output_video_path = None
+    clip.output_json_path = None
+    clip.thumbnail_path = None
+    clip.error_message = None
+    clip.status = "pending"
+
+    _process_clip_safely(session, clip, cfg)
+
+
 def move_clip_to_trash(clip: Clip, cfg: AppConfig) -> None:
     """Soft-delete: move a clip's files into the configured trash dir (mirroring
     the day/hour layout) rather than removing them from disk."""

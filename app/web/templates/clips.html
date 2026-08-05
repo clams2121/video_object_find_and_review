@@ -5,7 +5,7 @@
   <title>Clips</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body data-filter="{{ current_filter }}">
   <header>
     <h1>Camera Clip Review</h1>
     <nav>
@@ -13,17 +13,28 @@
       <a href="/errors">Errors</a>
       <a href="/config">Configuration</a>
     </nav>
+    <button id="shutdown-btn" class="shutdown-btn">Shutdown</button>
   </header>
   <main>
     <div id="worker-status" class="status-bar">Loading status&hellip;</div>
 
     <div class="toolbar">
+      <div class="filter-tabs">
+        <a href="/?filter=good" class="{{ 'active' if current_filter == 'good' else '' }}">Good</a>
+        <a href="/?filter=bad" class="{{ 'active' if current_filter == 'bad' else '' }}">Bad</a>
+        <a href="/?filter=all" class="{{ 'active' if current_filter == 'all' else '' }}">All</a>
+      </div>
       <span id="selected-count">0 selected</span>
       <button id="delete-selected" disabled>Delete selected</button>
+      <button id="delete-all-bad" class="danger">Delete all bad</button>
     </div>
 
     {% if not days %}
-      <div class="empty-state">No clips yet. Check back after the next scan, or verify your watch directories in Configuration.</div>
+      <div class="empty-state">
+        No {{ 'clips' if current_filter == 'all' else current_filter + ' clips' }} yet.
+        {% if current_filter != 'all' %}<a href="/?filter=all">View all clips</a> or check{% else %}Check{% endif %}
+        back after the next scan, or verify your watch directories in Configuration.
+      </div>
     {% endif %}
 
     {% for day in days %}
@@ -39,7 +50,7 @@
         <div class="tile-grid">
           {% for clip in hg.clips %}
           <div class="tile" data-clip-id="{{ clip.id }}">
-            <div class="thumb-wrap" data-video-url="/video/{{ clip.id }}">
+            <div class="thumb-wrap" data-video-url="/video/{{ clip.id }}" data-clip-id="{{ clip.id }}">
               <input type="checkbox" class="select-box" data-clip-id="{{ clip.id }}">
               <span class="badge {{ clip.status }}">{{ clip.status.replace('_', ' ') }}</span>
               {% if clip.thumbnail_path %}
@@ -55,6 +66,7 @@
             <div class="actions">
               <button class="good-btn" data-clip-id="{{ clip.id }}" data-label="good">Good</button>
               <button class="bad-btn" data-clip-id="{{ clip.id }}" data-label="bad">Bad</button>
+              <button class="reprocess-btn" data-clip-id="{{ clip.id }}">Reprocess</button>
             </div>
           </div>
           {% endfor %}
@@ -68,6 +80,10 @@
   <div id="modal">
     <button class="close-btn" id="modal-close">&times;</button>
     <video id="modal-video" controls></video>
+    <div class="modal-actions">
+      <button class="good-btn" id="modal-good-btn" data-label="good">Good</button>
+      <button class="bad-btn" id="modal-bad-btn" data-label="bad">Bad</button>
+    </div>
   </div>
 
   <script src="/static/app.js"></script>
