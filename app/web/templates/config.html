@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Configuration</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Camera Clip Review</h1>
+    <nav>
+      <a href="/">Clips</a>
+      <a href="/config">Configuration</a>
+    </nav>
+  </header>
+  <main>
+    <form class="config-form" method="post" action="/config">
+      <fieldset>
+        <legend>Server</legend>
+        <div class="field">
+          <label>Host</label>
+          <input type="text" value="{{ cfg.server.host }}" disabled>
+          <span class="hint">Edit config.yaml directly and restart to change host/port.</span>
+        </div>
+        <div class="field">
+          <label>Port</label>
+          <input type="text" value="{{ cfg.server.port }}" disabled>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Watch directories</legend>
+        <div class="field">
+          <label>One directory per line</label>
+          <textarea name="watch_directories">{{ cfg.watch_directories | join('\n') }}</textarea>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label>Scan interval (seconds)</label>
+            <input type="number" name="scan_interval_seconds" value="{{ cfg.scan_interval_seconds }}" min="5">
+          </div>
+          <div class="field">
+            <label>Min file age before processing (seconds)</label>
+            <input type="number" name="min_file_age_seconds" value="{{ cfg.min_file_age_seconds }}" min="0">
+            <span class="hint">Grace period so a still-writing file (or a second camera's clip for the same event) isn't picked up mid-write.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Output directories</legend>
+        <div class="field">
+          <label>Good detects</label>
+          <input type="text" name="good_dir" value="{{ cfg.output.good_dir }}">
+        </div>
+        <div class="field">
+          <label>Maybe (needs review)</label>
+          <input type="text" name="maybe_dir" value="{{ cfg.output.maybe_dir }}">
+        </div>
+        <div class="field">
+          <label>No detects</label>
+          <input type="text" name="no_detect_dir" value="{{ cfg.output.no_detect_dir }}">
+        </div>
+        <div class="field">
+          <label>Trash (deleted clips)</label>
+          <input type="text" name="trash_dir" value="{{ cfg.output.trash_dir }}">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Cross-camera event grouping</legend>
+        <div class="field">
+          <label>Overlap tolerance (seconds)</label>
+          <input type="number" step="0.5" name="overlap_tolerance_seconds" value="{{ cfg.event_grouping.overlap_tolerance_seconds }}">
+          <span class="hint">Clips from different cameras with overlapping (or nearly overlapping) time windows are linked as one event.</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Detection thresholds</legend>
+        <div class="two-col">
+          <div class="field">
+            <label>Minimum frames with motion</label>
+            <input type="number" name="min_frames" value="{{ cfg.detection.min_frames }}" min="1">
+          </div>
+          <div class="field">
+            <label>Minimum duration (seconds)</label>
+            <input type="number" step="0.1" name="min_duration_seconds" value="{{ cfg.detection.min_duration_seconds }}">
+          </div>
+          <div class="field">
+            <label>Minimum object size (fraction of frame)</label>
+            <input type="number" step="0.001" name="min_size_ratio" value="{{ cfg.detection.min_size_ratio }}">
+          </div>
+          <div class="field">
+            <label>Maximum object size (fraction of frame)</label>
+            <input type="number" step="0.01" name="max_size_ratio" value="{{ cfg.detection.max_size_ratio }}">
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label>Ambiguous band - low (escalate to YOLO above this)</label>
+            <input type="number" step="0.01" name="ambiguous_band_low" value="{{ cfg.detection.ambiguous_band[0] }}">
+          </div>
+          <div class="field">
+            <label>Ambiguous band - high (auto-accept above this)</label>
+            <input type="number" step="0.01" name="ambiguous_band_high" value="{{ cfg.detection.ambiguous_band[1] }}">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>YOLO object recognition</legend>
+        <div class="field row">
+          <input type="checkbox" id="yolo_enabled" name="yolo_enabled" {% if cfg.yolo.enabled %}checked{% endif %}>
+          <label for="yolo_enabled">Enabled</label>
+        </div>
+        <div class="field">
+          <label>Model</label>
+          <input type="text" name="yolo_model" value="{{ cfg.yolo.model }}">
+        </div>
+        <div class="field">
+          <label>Device</label>
+          <select name="yolo_device">
+            {% for opt in ['auto', 'cpu', 'cuda'] %}
+            <option value="{{ opt }}" {% if cfg.yolo.device == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Confidence threshold</label>
+          <input type="number" step="0.05" min="0" max="1" name="yolo_confidence_threshold" value="{{ cfg.yolo.confidence_threshold }}">
+        </div>
+        <div class="field">
+          <label>Classes of interest (comma separated)</label>
+          <input type="text" name="yolo_classes" value="{{ cfg.yolo.classes | join(', ') }}">
+        </div>
+      </fieldset>
+
+      <div class="submit-row">
+        <button type="submit">Save configuration</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

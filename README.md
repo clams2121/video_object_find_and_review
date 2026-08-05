@@ -1,2 +1,49 @@
 # video_object_find_and_review
-review and evaluate video clips to see if there are objects in them. 
+
+Second-stage reviewer for motion-triggered camera clips. Watches one or more
+directories for `.mp4` + `.json` pairs (produced by an upstream motion-capture
+tool), re-analyzes each clip cheaply for coherent motion (people/animals/
+vehicles vs. bugs, flags, IR day/night switches), escalates ambiguous cases to
+YOLO object detection, and sorts clips into good/maybe/no-detect output
+directories with a thumbnail and a web UI for review.
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Edit `config.yaml` — at minimum set `watch_directories` to the folder(s)
+where your camera tool drops `*.mp4`/`*.json` pairs. See the file for all
+options (output directories, scan interval, detection thresholds, YOLO
+settings). Most settings are also editable from the `/config` page while the
+app is running; `server.host`/`server.port` require a restart.
+
+## Run
+
+```bash
+python -m app.main
+```
+
+This starts the web app and a background scanner (polling
+`watch_directories` every `scan_interval_seconds`) in one process.
+
+- `/` — tile view of processed clips, grouped by day and hour
+- `/config` — configuration page
+
+## Tests
+
+```bash
+pytest
+```
+
+`scripts/synthetic_clips.py` generates synthetic mp4/json pairs (clean
+motion, a day/night flicker, a bug-sized jitter) used by the pipeline
+end-to-end test, and can also be run standalone to populate a watch
+directory for manual testing:
+
+```bash
+python scripts/synthetic_clips.py data/watch
+```

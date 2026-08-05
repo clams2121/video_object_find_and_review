@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Camera Clip Review Tool - runtime data (watch dir, output buckets, sqlite db)
+/data/
+/yolov8n.pt
+

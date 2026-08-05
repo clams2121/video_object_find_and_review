@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Clips</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Camera Clip Review</h1>
+    <nav>
+      <a href="/">Clips</a>
+      <a href="/config">Configuration</a>
+    </nav>
+  </header>
+  <main>
+    <div class="toolbar">
+      <span id="selected-count">0 selected</span>
+      <button id="delete-selected" disabled>Delete selected</button>
+    </div>
+
+    {% if not days %}
+      <div class="empty-state">No clips yet. Check back after the next scan, or verify your watch directories in Configuration.</div>
+    {% endif %}
+
+    {% for day in days %}
+    <div class="day-group">
+      <h2>{{ day.day }}</h2>
+      {% for hg in day.hours %}
+      <div class="hour-group">
+        <div class="hour-header">
+          <h3>{{ hg.hour }}:00</h3>
+          <span class="count">{{ hg.count }} clip{{ 's' if hg.count != 1 else '' }}</span>
+          <button class="delete-hour" data-day="{{ day.day }}" data-hour="{{ hg.hour }}">Delete all in this hour</button>
+        </div>
+        <div class="tile-grid">
+          {% for clip in hg.clips %}
+          <div class="tile" data-clip-id="{{ clip.id }}">
+            <div class="thumb-wrap" data-video-url="/video/{{ clip.id }}">
+              <input type="checkbox" class="select-box" data-clip-id="{{ clip.id }}">
+              <span class="badge {{ clip.status }}">{{ clip.status.replace('_', ' ') }}</span>
+              {% if clip.thumbnail_path %}
+              <img src="/thumb/{{ clip.id }}" loading="lazy" alt="thumbnail">
+              {% else %}
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9'/%3E" alt="no thumbnail">
+              {% endif %}
+            </div>
+            <div class="meta">
+              <div class="datetime">{{ clip.start_time.strftime('%H:%M:%S') }}</div>
+              <div>{{ clip.camera_id }}{% if clip.object_class %} &middot; <span class="obj">{{ clip.object_class }}</span>{% endif %}</div>
+            </div>
+            <div class="actions">
+              <button class="good-btn" data-clip-id="{{ clip.id }}" data-label="good">Good</button>
+              <button class="bad-btn" data-clip-id="{{ clip.id }}" data-label="bad">Bad</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </main>
+
+  <div id="modal">
+    <button class="close-btn" id="modal-close">&times;</button>
+    <video id="modal-video" controls></video>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
