@@ -76,14 +76,46 @@ def _move_output_files(clip: Clip, dest_dir: Path) -> None:
             setattr(clip, attr, str(dest))
 
 
-def _gather_candidate_frames(video_path: str, best_frame_index: int) -> list:
-    frames = []
+def _gather_candidate_frames(video_path: str, best_frame_index: int) -> list[tuple[int, "cv2.typing.MatLike"]]:
+    """Returns (video_frame_index, frame) pairs so the caller can trace a
+    winning YOLO detection back to the exact frame it came from."""
+    candidates = []
     for offset in (0, -2, 2):
         idx = max(0, best_frame_index + offset)
         frame = motion.extract_frame(video_path, idx)
         if frame is not None:
-            frames.append(frame)
-    return frames
+            candidates.append((idx, frame))
+    return candidates
+
+
+def _crop_and_zoom_thumbnail(frame, bbox_xywh, pad_ratio: float = 0.25, target_min_dim: int = 300):
+    """Crops the frame to the moving object's bounding box (with padding for
+    context) and upscales small crops so the thumbnail actually shows what
+    moved, instead of a barely-visible speck in a wide static scene."""
+    if frame is None or bbox_xywh is None:
+        return frame
+
+    frame_h, frame_w = frame.shape[:2]
+    x, y, w, h = bbox_xywh
+    pad_x = w * pad_ratio
+    pad_y = h * pad_ratio
+    x0 = max(0, int(x - pad_x))
+    y0 = max(0, int(y - pad_y))
+    x1 = min(frame_w, int(x + w + pad_x))
+    y1 = min(frame_h, int(y + h + pad_y))
+
+    if x1 <= x0 or y1 <= y0:
+        return frame
+
+    crop = frame[y0:y1, x0:x1]
+    crop_h, crop_w = crop.shape[:2]
+    if crop_w == 0 or crop_h == 0:
+        return frame
+
+    scale = target_min_dim / min(crop_w, crop_h)
+    if scale > 1.0:
+        crop = cv2.resize(crop, (int(crop_w * scale), int(crop_h * scale)), interpolation=cv2.INTER_CUBIC)
+    return crop
 
 
 def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
@@ -113,28 +145,43 @@ def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
     clip.motion_confidence = result.confidence
     clip.tier_reached = "motion"
 
+    # Default thumbnail source: the motion tier's largest-contour frame, with
+    # its bounding box mapped from analysis resolution back to the original.
+    thumb_frame_index = result.best_frame_index if result.best_frame_index is not None else 0
+    thumb_frame = motion.extract_frame(clip.source_video_path, thumb_frame_index)
+    thumb_bbox = None
+    if result.best_frame_bbox is not None:
+        bx, by, bw, bh = result.best_frame_bbox
+        s = result.analysis_scale
+        thumb_bbox = (bx * s, by * s, bw * s, bh * s)
+
     low, high = detection_cfg.ambiguous_band
     if result.is_flicker or result.confidence < low:
         final_status = "no_detect"
     elif result.confidence > high:
         final_status = "good"
     elif cfg.yolo.enabled and result.best_frame_index is not None:
-        frames = _gather_candidate_frames(clip.source_video_path, result.best_frame_index)
+        frame_candidates = _gather_candidate_frames(clip.source_video_path, result.best_frame_index)
         detection = _run_with_timeout(
-            yolo_detect.classify_frames, cfg.processing_timeout_seconds, frames, cfg.yolo
+            yolo_detect.classify_frames,
+            cfg.processing_timeout_seconds,
+            [f for _, f in frame_candidates],
+            cfg.yolo,
         )
         clip.tier_reached = "yolo"
         if detection is not None:
             final_status = "good"
             clip.object_class = detection.class_name
             clip.object_confidence = detection.confidence
+            # YOLO's bbox/frame are already at original resolution, and more
+            # precisely locate the object than the motion tier's contour box.
+            x1, y1, x2, y2 = detection.bbox
+            thumb_bbox = (x1, y1, x2 - x1, y2 - y1)
+            thumb_frame = frame_candidates[detection.frame_index][1]
         else:
             final_status = "maybe"
     else:
         final_status = "maybe"
-
-    thumb_frame_index = result.best_frame_index if result.best_frame_index is not None else 0
-    thumb_frame = motion.extract_frame(clip.source_video_path, thumb_frame_index)
 
     dest_dir = _destination_dir(cfg, final_status, clip.start_time)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -142,8 +189,9 @@ def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
     dest_json = dest_dir / f"{clip.event_id_ext}.json"
     dest_thumb = dest_dir / f"{clip.event_id_ext}.jpg"
 
-    if thumb_frame is not None:
-        cv2.imwrite(str(dest_thumb), thumb_frame)
+    thumbnail = _crop_and_zoom_thumbnail(thumb_frame, thumb_bbox)
+    if thumbnail is not None:
+        cv2.imwrite(str(dest_thumb), thumbnail)
         clip.thumbnail_path = str(dest_thumb)
 
     shutil.move(clip.source_video_path, dest_video)
