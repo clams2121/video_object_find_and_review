@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 _ANALYSIS_WIDTH = 320  # downscale target for cheap analysis
 _NOISE_AREA_RATIO = 0.0005  # contours smaller than this fraction of frame are ignored as noise
 _FLICKER_BRIGHTNESS_DELTA = 40.0  # mean-gray jump considered a day/night IR switch
+_WARMUP_FRAMES = 2  # MOG2 has no background model yet on the first apply() call and
+# reports the entire frame as foreground - fed to the subtractor to seed the
+# model, but not treated as a real observation.
 
 
 @dataclass
@@ -88,7 +91,7 @@ def analyze_motion(video_path: str, detection_cfg: DetectionConfig) -> MotionRes
         contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         frame_area = frame.shape[0] * frame.shape[1]
 
-        if contours:
+        if contours and frame_index >= _WARMUP_FRAMES:
             largest = max(contours, key=cv2.contourArea)
             area = cv2.contourArea(largest)
             area_ratio = area / frame_area

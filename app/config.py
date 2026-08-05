@@ -52,6 +52,7 @@ class AppConfig(BaseModel):
     watch_directories: list[str] = []
     scan_interval_seconds: int = 60
     min_file_age_seconds: int = 30
+    processing_timeout_seconds: int = 120
     output: OutputConfig = OutputConfig()
     database_path: str = "./data/app.db"
     event_grouping: EventGroupingConfig = EventGroupingConfig()

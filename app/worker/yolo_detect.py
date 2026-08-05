@@ -16,7 +16,8 @@ _model_cache: dict[str, object] = {}
 class Detection:
     class_name: str
     confidence: float
-    bbox: tuple[int, int, int, int]  # x1, y1, x2, y2
+    bbox: tuple[int, int, int, int]  # x1, y1, x2, y2 - original frame resolution
+    frame_index: int  # index into the `frames` list passed to classify_frames
 
 
 def _resolve_device(device_cfg: str) -> str:
@@ -52,7 +53,7 @@ def classify_frames(frames: list[np.ndarray], cfg: YoloConfig) -> Detection | No
 
     best: Detection | None = None
     results = model.predict(source=frames, device=device, verbose=False)
-    for result in results:
+    for i, result in enumerate(results):
         names = result.names
         for box in result.boxes:
             class_name = names[int(box.cls[0])]
@@ -63,6 +64,6 @@ def classify_frames(frames: list[np.ndarray], cfg: YoloConfig) -> Detection | No
                 continue
             if best is None or confidence > best.confidence:
                 x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
-                best = Detection(class_name=class_name, confidence=confidence, bbox=(x1, y1, x2, y2))
+                best = Detection(class_name=class_name, confidence=confidence, bbox=(x1, y1, x2, y2), frame_index=i)
 
     return best

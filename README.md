@@ -37,8 +37,13 @@ python -m app.main
 This starts the web app and a background scanner (polling
 `watch_directories` every `scan_interval_seconds`) in one process.
 
-- `/` — tile view of processed clips, grouped by day and hour
+- `/` — tile view of processed clips, grouped by day and hour, with a live
+  status bar ("Processing 3 of 10: camera1_...") so a long-running scan is
+  never silently stuck
 - `/config` — configuration page
+- `/errors` — clips that failed to process, plus recent warning/error log
+  events; the same errors are also written to `data/logs/app.log`
+  (rotated automatically) if you'd rather tail a file
 
 ## Tests
 

@@ -1,11 +1,12 @@
 import datetime as dt
+from pathlib import Path
 
 from sqlalchemy import select
 
 from app.config import AppConfig, DetectionConfig, OutputConfig
 from app.models import Clip
 from app.worker import scanner
-from app.worker.pipeline import _process_clip
+from app.worker.pipeline import _process_clip, reprocess_clip
 from scripts.synthetic_clips import make_clean_motion_clip, make_flicker_clip
 
 
@@ -47,7 +48,6 @@ def test_clean_motion_clip_is_classified_good_and_moved(tmp_path, db_session):
     assert clip.status == "good"
     assert clip.output_video_path is not None
     assert "good" in clip.output_video_path
-    from pathlib import Path
     assert Path(clip.output_video_path).exists()
     assert Path(clip.thumbnail_path).exists()
     # source files should have been moved out of the watch directory
@@ -78,3 +78,45 @@ def test_rescanning_does_not_reregister_processed_clips(tmp_path, db_session):
 
     new_ids = scanner.discover_and_register(db_session, cfg)
     assert new_ids == []
+
+
+def test_reprocess_rereads_the_already_moved_clip(tmp_path, db_session):
+    watch_dir = tmp_path / "watch"
+    watch_dir.mkdir()
+    make_clean_motion_clip(watch_dir, "camera1_clean3", "camera1", dt.datetime(2026, 8, 4, 19, 15, 0))
+
+    cfg = _make_cfg(tmp_path, watch_dir)
+    cfg.yolo.enabled = False
+    clips = _run_pipeline_for_all_pending(db_session, cfg)
+    clip = clips[0]
+    assert clip.status == "good"
+    first_video_path = clip.output_video_path
+    first_thumb_path = clip.thumbnail_path
+    assert Path(first_video_path).exists()
+    assert Path(first_thumb_path).exists()
+
+    reprocess_clip(db_session, clip, cfg)
+
+    assert clip.status == "good"
+    # file moved back to the (same) good/ folder, not lost or left in limbo
+    assert clip.output_video_path == first_video_path
+    assert Path(clip.output_video_path).exists()
+    assert Path(clip.thumbnail_path).exists()
+
+
+def test_reprocess_is_a_noop_for_trashed_clips(tmp_path, db_session):
+    watch_dir = tmp_path / "watch"
+    watch_dir.mkdir()
+    make_clean_motion_clip(watch_dir, "camera1_clean4", "camera1", dt.datetime(2026, 8, 4, 19, 20, 0))
+
+    cfg = _make_cfg(tmp_path, watch_dir)
+    cfg.yolo.enabled = False
+    clip = _run_pipeline_for_all_pending(db_session, cfg)[0]
+    trashed_video_path = clip.output_video_path
+    clip.status = "trashed"
+
+    reprocess_clip(db_session, clip, cfg)
+
+    assert clip.status == "trashed"
+    assert clip.output_video_path == trashed_video_path
+    assert Path(trashed_video_path).exists()

@@ -10,8 +10,10 @@
     <h1>Camera Clip Review</h1>
     <nav>
       <a href="/">Clips</a>
+      <a href="/errors">Errors</a>
       <a href="/config">Configuration</a>
     </nav>
+    <button id="shutdown-btn" class="shutdown-btn">Shutdown</button>
   </header>
   <main>
     <form class="config-form" method="post" action="/config">
@@ -44,6 +46,11 @@
             <input type="number" name="min_file_age_seconds" value="{{ cfg.min_file_age_seconds }}" min="0">
             <span class="hint">Grace period so a still-writing file (or a second camera's clip for the same event) isn't picked up mid-write.</span>
           </div>
+        </div>
+        <div class="field">
+          <label>Per-clip processing timeout (seconds)</label>
+          <input type="number" name="processing_timeout_seconds" value="{{ cfg.processing_timeout_seconds }}" min="5">
+          <span class="hint">If motion analysis or object detection on a single clip takes longer than this, it's marked as an error (see the Errors page) instead of freezing the whole queue.</span>
         </div>
       </fieldset>
 
@@ -141,5 +148,6 @@
       </div>
     </form>
   </main>
+  <script src="/static/app.js"></script>
 </body>
 </html>

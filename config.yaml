@@ -6,6 +6,7 @@ watch_directories: []
 
 scan_interval_seconds: 60
 min_file_age_seconds: 30
+processing_timeout_seconds: 120
 
 output:
   good_dir: ./data/output/good
