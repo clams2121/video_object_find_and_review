@@ -25,8 +25,10 @@
         <a href="/?filter=all" class="{{ 'active' if current_filter == 'all' else '' }}">All</a>
       </div>
       <span id="selected-count">0 selected</span>
+      <button id="reprocess-selected" disabled>Reprocess selected</button>
       <button id="delete-selected" disabled>Delete selected</button>
       <button id="delete-all-bad" class="danger">Delete all bad</button>
+      <button id="toggle-all-days">Hide all</button>
     </div>
 
     {% if not days %}
@@ -39,7 +41,11 @@
 
     {% for day in days %}
     <div class="day-group">
-      <h2>{{ day.day }}</h2>
+      <h2 class="day-header">
+        <span class="chevron">&#9662;</span> {{ day.day }}
+        <span class="count">{{ day.hours | sum(attribute='count') }} clip{{ 's' if (day.hours | sum(attribute='count')) != 1 else '' }}</span>
+      </h2>
+      <div class="day-body">
       {% for hg in day.hours %}
       <div class="hour-group">
         <div class="hour-header">
@@ -73,6 +79,7 @@
         </div>
       </div>
       {% endfor %}
+      </div>
     </div>
     {% endfor %}
   </main>

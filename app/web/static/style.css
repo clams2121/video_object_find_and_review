@@ -118,7 +118,20 @@ code { background: var(--panel); border: 1px solid var(--border); border-radius:
 .filter-tabs a:hover { color: var(--text); }
 .filter-tabs a.active { color: var(--text); background: var(--bg); border-color: var(--border); font-weight: 600; }
 
-.day-group h2 { margin: 24px 0 8px; font-size: 16px; color: var(--muted); }
+.day-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 8px;
+  font-size: 16px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.day-header .chevron { display: inline-block; transition: transform 0.15s; font-size: 12px; }
+.day-header .count { font-size: 12px; font-weight: normal; }
+.day-group.collapsed .chevron { transform: rotate(-90deg); }
+.day-group.collapsed .day-body { display: none; }
 
 .hour-group { margin-bottom: 18px; }
 .hour-header {

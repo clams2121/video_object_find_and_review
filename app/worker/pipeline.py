@@ -216,7 +216,12 @@ def reprocess_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
     """Re-run the full pipeline on a clip that's already been processed once
     (e.g. to fix a bad thumbnail or reclassify after a config/threshold
     change). Points source_*_path at wherever the files currently live so
-    the normal _process_clip logic - unchanged - can move them again."""
+    the normal _process_clip logic - unchanged - can move them again.
+    No-op for trashed clips: deletion is a deliberate final action, and
+    reprocessing would pull the file back out of the trash folder."""
+    if clip.status == "trashed":
+        return
+
     if clip.thumbnail_path and Path(clip.thumbnail_path).exists():
         Path(clip.thumbnail_path).unlink()
 

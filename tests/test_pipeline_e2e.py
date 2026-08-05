@@ -102,3 +102,21 @@ def test_reprocess_rereads_the_already_moved_clip(tmp_path, db_session):
     assert clip.output_video_path == first_video_path
     assert Path(clip.output_video_path).exists()
     assert Path(clip.thumbnail_path).exists()
+
+
+def test_reprocess_is_a_noop_for_trashed_clips(tmp_path, db_session):
+    watch_dir = tmp_path / "watch"
+    watch_dir.mkdir()
+    make_clean_motion_clip(watch_dir, "camera1_clean4", "camera1", dt.datetime(2026, 8, 4, 19, 20, 0))
+
+    cfg = _make_cfg(tmp_path, watch_dir)
+    cfg.yolo.enabled = False
+    clip = _run_pipeline_for_all_pending(db_session, cfg)[0]
+    trashed_video_path = clip.output_video_path
+    clip.status = "trashed"
+
+    reprocess_clip(db_session, clip, cfg)
+
+    assert clip.status == "trashed"
+    assert clip.output_video_path == trashed_video_path
+    assert Path(trashed_video_path).exists()

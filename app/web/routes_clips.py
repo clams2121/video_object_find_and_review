@@ -106,12 +106,25 @@ def reprocess(clip_id: int):
     return JSONResponse({"ok": True, "status": result_status})
 
 
-class DeleteRequest(BaseModel):
+class ClipIdsRequest(BaseModel):
     clip_ids: list[int]
 
 
+@router.post("/clips/reprocess")
+def reprocess_selected(body: ClipIdsRequest):
+    # reprocess_clip() itself no-ops on trashed clips, so nothing extra
+    # needed here to keep them untouched.
+    cfg = get_config()
+    with session_scope() as session:
+        for clip_id in body.clip_ids:
+            clip = session.get(Clip, clip_id)
+            if clip is not None:
+                reprocess_clip(session, clip, cfg)
+    return JSONResponse({"ok": True})
+
+
 @router.post("/clips/delete")
-def delete_clips(body: DeleteRequest):
+def delete_clips(body: ClipIdsRequest):
     cfg = get_config()
     with session_scope() as session:
         for clip_id in body.clip_ids:

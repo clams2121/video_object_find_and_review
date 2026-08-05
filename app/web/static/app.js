@@ -3,15 +3,43 @@ const selected = new Set();
 function updateToolbar() {
   const countEl = document.getElementById("selected-count");
   const deleteBtn = document.getElementById("delete-selected");
+  const reprocessBtn = document.getElementById("reprocess-selected");
   if (!countEl || !deleteBtn) return; // this script is shared across pages that don't all have a toolbar
   countEl.textContent = `${selected.size} selected`;
   deleteBtn.disabled = selected.size === 0;
+  if (reprocessBtn) reprocessBtn.disabled = selected.size === 0;
 }
 
 document.getElementById("delete-all-bad")?.addEventListener("click", async () => {
   if (!confirm("Delete ALL clips currently classified as bad (no detect)? They will be moved to the trash directory.")) return;
   await fetch("/clips/delete_all_bad", { method: "POST" });
   window.location.reload();
+});
+
+document.getElementById("reprocess-selected")?.addEventListener("click", async (e) => {
+  if (selected.size === 0) return;
+  if (!confirm(`Reprocess ${selected.size} clip(s)? This re-runs detection from scratch and can change their status.`)) return;
+  e.target.disabled = true;
+  e.target.textContent = "Reprocessing…";
+  await fetch("/clips/reprocess", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clip_ids: Array.from(selected) }),
+  });
+  window.location.reload();
+});
+
+document.querySelectorAll(".day-header").forEach((header) => {
+  header.addEventListener("click", () => {
+    header.closest(".day-group").classList.toggle("collapsed");
+  });
+});
+
+document.getElementById("toggle-all-days")?.addEventListener("click", (e) => {
+  const groups = document.querySelectorAll(".day-group");
+  const anyExpanded = Array.from(groups).some((g) => !g.classList.contains("collapsed"));
+  groups.forEach((g) => g.classList.toggle("collapsed", anyExpanded));
+  e.target.textContent = anyExpanded ? "Show all" : "Hide all";
 });
 
 document.querySelectorAll(".select-box").forEach((box) => {
