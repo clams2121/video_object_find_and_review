@@ -1,0 +1,40 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+
+watch_directories: []
+
+scan_interval_seconds: 60
+min_file_age_seconds: 30
+
+output:
+  good_dir: ./data/output/good
+  maybe_dir: ./data/output/maybe
+  no_detect_dir: ./data/output/no_detect
+  trash_dir: ./data/output/trash
+
+database_path: ./data/app.db
+
+event_grouping:
+  overlap_tolerance_seconds: 5
+
+detection:
+  min_frames: 5
+  min_size_ratio: 0.01
+  max_size_ratio: 0.9
+  min_duration_seconds: 0.5
+  ambiguous_band: [0.35, 0.65]
+
+yolo:
+  enabled: true
+  model: yolov8n.pt
+  device: auto
+  confidence_threshold: 0.4
+  classes: [person, dog, cat, deer, horse, cow, bird, car, truck, bus, motorcycle, bicycle]
+
+json_field_map:
+  event_id: event_id
+  camera_id: camera_id
+  start_time: start_time
+  end_time: end_time
+  video_path: video_path
