@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import threading
 from pathlib import Path
 
 import cv2
@@ -12,6 +13,7 @@ from app.config import AppConfig, get_config
 from app.db import session_scope
 from app.models import Clip, Feedback
 from app.worker import motion, scanner, yolo_detect
+from app.worker.status import status as worker_status
 from app.worker.thresholds import get_effective_detection_config, recompute_thresholds
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,34 @@ _OUTPUT_DIR_BY_STATUS = {
 }
 
 
+def _run_with_timeout(fn, timeout_seconds, *args, **kwargs):
+    """Runs fn in a daemon thread and raises TimeoutError if it doesn't finish
+    in time, instead of letting a hung cv2/YOLO call block the whole worker
+    loop forever. Python can't force-kill a thread, so a timed-out call is
+    abandoned (not joined) rather than awaited - the caller must treat the
+    clip as failed and move on. The thread is daemonized (unlike
+    ThreadPoolExecutor's workers) so a call that never returns can't prevent
+    the process itself from shutting down."""
+    box: dict = {}
+
+    def _target():
+        try:
+            box["value"] = fn(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - re-raised on the caller's thread below
+            box["exc"] = exc
+
+    thread = threading.Thread(target=_target, daemon=True)
+    thread.start()
+    thread.join(timeout_seconds)
+
+    if thread.is_alive():
+        name = getattr(fn, "__name__", "operation")
+        raise TimeoutError(f"{name} exceeded {timeout_seconds}s timeout")
+    if "exc" in box:
+        raise box["exc"]
+    return box.get("value")
+
+
 def _destination_dir(cfg: AppConfig, status: str, start_time) -> Path:
     attr = _OUTPUT_DIR_BY_STATUS[status]
     base = getattr(cfg.output, attr)
@@ -31,12 +61,15 @@ def _destination_dir(cfg: AppConfig, status: str, start_time) -> Path:
 
 def _move_output_files(clip: Clip, dest_dir: Path) -> None:
     dest_dir.mkdir(parents=True, exist_ok=True)
-    for attr, suffix in (
-        ("output_video_path", ".mp4"),
-        ("output_json_path", ".json"),
-        ("thumbnail_path", ".jpg"),
-    ):
-        src = getattr(clip, attr)
+    # Clips that errored out before the normal move step still have their
+    # files at source_*_path rather than output_*_path - fall back so they
+    # can still be reclassified or trashed from the UI.
+    candidates = (
+        (clip.output_video_path or clip.source_video_path, ".mp4", "output_video_path"),
+        (clip.output_json_path or clip.source_json_path, ".json", "output_json_path"),
+        (clip.thumbnail_path, ".jpg", "thumbnail_path"),
+    )
+    for src, suffix, attr in candidates:
         if src and Path(src).exists():
             dest = dest_dir / f"{clip.event_id_ext}{suffix}"
             shutil.move(src, dest)
@@ -58,12 +91,16 @@ def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
     session.flush()
 
     detection_cfg = get_effective_detection_config(session, cfg.detection)
-    result = motion.analyze_motion(clip.source_video_path, detection_cfg)
+    result = _run_with_timeout(
+        motion.analyze_motion, cfg.processing_timeout_seconds, clip.source_video_path, detection_cfg
+    )
 
     if result.error:
-        logger.error("Motion analysis failed for clip %s: %s", clip.event_id_ext, result.error)
-        clip.status = "no_detect"
+        logger.error("Motion analysis could not read clip %s: %s", clip.event_id_ext, result.error)
+        clip.status = "error"
+        clip.error_message = result.error
         clip.tier_reached = "motion"
+        worker_status.record_error(f"{clip.event_id_ext}: {result.error}", clip.event_id_ext)
         return
 
     clip.size_min = result.size_min
@@ -78,26 +115,28 @@ def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
 
     low, high = detection_cfg.ambiguous_band
     if result.is_flicker or result.confidence < low:
-        status = "no_detect"
+        final_status = "no_detect"
     elif result.confidence > high:
-        status = "good"
+        final_status = "good"
     elif cfg.yolo.enabled and result.best_frame_index is not None:
         frames = _gather_candidate_frames(clip.source_video_path, result.best_frame_index)
-        detection = yolo_detect.classify_frames(frames, cfg.yolo)
+        detection = _run_with_timeout(
+            yolo_detect.classify_frames, cfg.processing_timeout_seconds, frames, cfg.yolo
+        )
         clip.tier_reached = "yolo"
         if detection is not None:
-            status = "good"
+            final_status = "good"
             clip.object_class = detection.class_name
             clip.object_confidence = detection.confidence
         else:
-            status = "maybe"
+            final_status = "maybe"
     else:
-        status = "maybe"
+        final_status = "maybe"
 
     thumb_frame_index = result.best_frame_index if result.best_frame_index is not None else 0
     thumb_frame = motion.extract_frame(clip.source_video_path, thumb_frame_index)
 
-    dest_dir = _destination_dir(cfg, status, clip.start_time)
+    dest_dir = _destination_dir(cfg, final_status, clip.start_time)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_video = dest_dir / f"{clip.event_id_ext}.mp4"
     dest_json = dest_dir / f"{clip.event_id_ext}.json"
@@ -112,7 +151,17 @@ def _process_clip(session: Session, clip: Clip, cfg: AppConfig) -> None:
     clip.output_video_path = str(dest_video)
     clip.output_json_path = str(dest_json)
 
-    clip.status = status
+    clip.status = final_status
+
+
+def _process_clip_safely(session: Session, clip: Clip, cfg: AppConfig) -> None:
+    try:
+        _process_clip(session, clip, cfg)
+    except Exception as exc:
+        logger.exception("Failed to process clip %s (id=%s)", clip.event_id_ext, clip.id)
+        clip.status = "error"
+        clip.error_message = str(exc)[:2000]
+        worker_status.record_error(f"{clip.event_id_ext}: {exc}", clip.event_id_ext)
 
 
 def move_clip_to_trash(clip: Clip, cfg: AppConfig) -> None:
@@ -142,22 +191,32 @@ def record_feedback(session: Session, clip: Clip, label: str, cfg: AppConfig) ->
 
 def run_scan_cycle() -> None:
     cfg = get_config()
+    worker_status.begin_cycle()
 
-    with session_scope() as session:
-        new_ids = scanner.discover_and_register(session, cfg)
-    if new_ids:
-        logger.info("Registered %d new clip(s)", len(new_ids))
+    try:
+        with session_scope() as session:
+            new_ids = scanner.discover_and_register(session, cfg)
+        if new_ids:
+            logger.info("Registered %d new clip(s)", len(new_ids))
+    except Exception:
+        logger.exception("Directory scan failed")
+        worker_status.record_error("Directory scan failed - see log for details")
+        worker_status.finish_cycle()
+        return
 
     with session_scope() as session:
         pending_ids = list(
             session.execute(select(Clip.id).where(Clip.status == "pending")).scalars()
         )
 
-    for clip_id in pending_ids:
-        try:
-            with session_scope() as session:
-                clip = session.get(Clip, clip_id)
-                if clip is not None and clip.status in ("pending", "processing"):
-                    _process_clip(session, clip, cfg)
-        except Exception:
-            logger.exception("Failed to process clip id=%s", clip_id)
+    worker_status.begin_batch(len(pending_ids))
+
+    for i, clip_id in enumerate(pending_ids, start=1):
+        with session_scope() as session:
+            clip = session.get(Clip, clip_id)
+            if clip is None or clip.status != "pending":
+                continue
+            worker_status.set_current(i, clip.event_id_ext)
+            _process_clip_safely(session, clip, cfg)
+
+    worker_status.finish_cycle()

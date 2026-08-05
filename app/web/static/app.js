@@ -81,3 +81,48 @@ document.querySelectorAll(".good-btn, .bad-btn").forEach((btn) => {
 });
 
 updateToolbar();
+
+function formatElapsed(startedAtIso) {
+  if (!startedAtIso) return "";
+  const start = new Date(startedAtIso + "Z");
+  const secs = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+  if (secs < 60) return `${secs}s`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+async function refreshStatus() {
+  const el = document.getElementById("worker-status");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/status");
+    const data = await res.json();
+
+    let text;
+    if (data.state === "processing") {
+      text = `Processing ${data.current_index} of ${data.total}: ${data.current_event_id} `
+        + `(${formatElapsed(data.current_started_at)} elapsed)`;
+    } else if (data.state === "scanning") {
+      text = "Scanning for new clips&hellip;";
+    } else if (data.last_cycle_finished_at) {
+      const finished = new Date(data.last_cycle_finished_at + "Z");
+      text = `Idle &mdash; last scan finished at ${finished.toLocaleTimeString()}`;
+    } else {
+      text = "Idle";
+    }
+
+    if (data.error_clip_count > 0) {
+      text += ` &mdash; <a href="/errors" class="error-link">&#9888; ${data.error_clip_count} clip(s) failed, view errors</a>`;
+    }
+
+    el.innerHTML = text;
+    el.className = "status-bar"
+      + (data.state === "processing" || data.state === "scanning" ? " active" : "")
+      + (data.error_clip_count > 0 ? " has-errors" : "");
+  } catch (e) {
+    el.textContent = "Could not reach the server to check processing status.";
+    el.className = "status-bar has-errors";
+  }
+}
+
+refreshStatus();
+setInterval(refreshStatus, 3000);

@@ -9,6 +9,7 @@
   --good: #3fbf6f;
   --maybe: #e0a83f;
   --bad: #e0503f;
+  --error: #b83fe0;
 }
 
 * { box-sizing: border-box; }
@@ -37,6 +38,35 @@ header nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
 header nav a:hover { color: var(--text); }
 
 main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+.status-bar {
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.status-bar.active { border-left-color: var(--accent); color: var(--text); }
+.status-bar.has-errors { border-left-color: var(--error); }
+.status-bar .error-link, .error-link { color: var(--error); font-weight: 600; text-decoration: none; }
+.status-bar .error-link:hover, .error-link:hover { text-decoration: underline; }
+
+.table-wrap { overflow-x: auto; margin-bottom: 24px; }
+.error-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.error-table th, .error-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.error-table td:last-child { white-space: normal; }
+.error-table th { color: var(--muted); font-weight: 600; }
+.error-table tr.level-error td:nth-child(2) { color: var(--bad); font-weight: 600; }
+.error-table tr.level-warning td:nth-child(2) { color: var(--maybe); font-weight: 600; }
+code { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
 
 .toolbar {
   display: flex;
@@ -127,6 +157,7 @@ main { padding: 20px; max-width: 1400px; margin: 0 auto; }
 .badge.good { background: var(--good); }
 .badge.maybe { background: var(--maybe); }
 .badge.no_detect { background: var(--bad); }
+.badge.error { background: var(--error); }
 .badge.pending, .badge.processing { background: var(--muted); }
 
 .tile .meta { padding: 8px 10px; font-size: 12px; color: var(--muted); }

@@ -29,6 +29,7 @@ def update_config(
     watch_directories: str = Form(""),
     scan_interval_seconds: int = Form(60),
     min_file_age_seconds: int = Form(30),
+    processing_timeout_seconds: int = Form(120),
     good_dir: str = Form(...),
     maybe_dir: str = Form(...),
     no_detect_dir: str = Form(...),
@@ -53,6 +54,7 @@ def update_config(
         watch_directories=[line.strip() for line in watch_directories.splitlines() if line.strip()],
         scan_interval_seconds=scan_interval_seconds,
         min_file_age_seconds=min_file_age_seconds,
+        processing_timeout_seconds=processing_timeout_seconds,
         output=OutputConfig(
             good_dir=good_dir,
             maybe_dir=maybe_dir,

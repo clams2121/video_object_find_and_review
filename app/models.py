@@ -54,7 +54,9 @@ class Clip(Base):
     duration: Mapped[float] = mapped_column(Float)
 
     status: Mapped[str] = mapped_column(String, default="pending", index=True)
-    # pending | processing | good | maybe | no_detect | trashed
+    # pending | processing | good | maybe | no_detect | error | trashed
+
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
 
     tier_reached: Mapped[str | None] = mapped_column(String, nullable=True)  # motion | yolo
     object_class: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -100,3 +102,15 @@ class LearnedThreshold(Base):
     key: Mapped[str] = mapped_column(String, primary_key=True)
     value: Mapped[float] = mapped_column(Float)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class WorkerEvent(Base):
+    """Durable WARNING+ log record, so failures are visible on the /errors
+    page even after a restart (in addition to the rotating log file)."""
+
+    __tablename__ = "worker_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    level: Mapped[str] = mapped_column(String)  # WARNING | ERROR | CRITICAL
+    message: Mapped[str] = mapped_column(String)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow, index=True)

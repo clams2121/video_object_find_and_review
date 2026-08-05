@@ -48,9 +48,13 @@ def tile_view(request: Request):
 def get_video(clip_id: int):
     with session_scope() as session:
         clip = session.get(Clip, clip_id)
-        if clip is None or not clip.output_video_path:
+        if clip is None:
             raise HTTPException(404)
-        path = clip.output_video_path
+        # Clips that errored out before the move step still have their
+        # video at source_video_path rather than output_video_path.
+        path = clip.output_video_path or clip.source_video_path
+        if not path:
+            raise HTTPException(404)
     return FileResponse(path, media_type="video/mp4")
 
 
