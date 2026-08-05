@@ -7,13 +7,20 @@ vehicles vs. bugs, flags, IR day/night switches), escalates ambiguous cases to
 YOLO object detection, and sorts clips into good/maybe/no-detect output
 directories with a thumbnail and a web UI for review.
 
-## Setup
+## Install
+
+Download the code and install its dependencies into a folder on the machine
+that will run it:
 
 ```bash
+git clone https://github.com/clams2121/video_object_find_and_review.git
+cd video_object_find_and_review
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+## Configure
 
 Edit `config.yaml` — at minimum set `watch_directories` to the folder(s)
 where your camera tool drops `*.mp4`/`*.json` pairs. See the file for all
