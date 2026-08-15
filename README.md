@@ -45,6 +45,40 @@ This starts the web app and a background scanner (polling
   events; the same errors are also written to `data/logs/app.log`
   (rotated automatically) if you'd rather tail a file
 
+## Run as a service (systemd)
+
+So the app comes back after a reboot and restarts itself if it ever crashes,
+install it as a systemd service. From the project directory (after
+following Install above):
+
+```bash
+sudo sed \
+  -e "s#__INSTALL_DIR__#$(pwd)#g" \
+  -e "s#__SERVICE_USER__#$(whoami)#g" \
+  camera-clip-review.service > /etc/systemd/system/camera-clip-review.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now camera-clip-review
+```
+
+Check on it:
+
+```bash
+systemctl status camera-clip-review
+journalctl -u camera-clip-review -f     # follow the logs
+```
+
+To take it down deliberately, use `sudo systemctl stop camera-clip-review`
+(or the in-app Shutdown button, which does the same clean stop) rather than
+`kill -9` — both are recognized as a clean exit, so systemd won't
+immediately restart it.
+
+After `update.sh` pulls a new version, restart the service to pick it up:
+
+```bash
+sudo systemctl restart camera-clip-review
+```
+
 ## Tests
 
 ```bash
